@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>시간의 수호자 · 보성 현장 — 보리의 부화</title>
+<style>
+  :root{--ink:#2b2a26;--muted:#7a7468;--bg:#f4efe4;--card:#fffaf0;--accent:#3f9b7a;--warm:#e39b4a}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+  canvas{position:fixed;inset:0;width:100%!important;height:100%!important;display:block}
+  .page{position:fixed;inset:0;overflow:auto;padding:22px 18px 40px;background:var(--bg);z-index:5}
+  .page h1{font-size:22px;margin:6px 0 4px}
+  .page h2{font-size:17px;margin:18px 0 8px}
+  .muted{color:var(--muted);font-size:14px}
+  .card{background:var(--card);border-radius:14px;padding:14px 16px;margin:12px 0;box-shadow:0 1px 3px rgba(0,0,0,.06);line-height:1.55;font-size:15px}
+  .btn{display:block;width:100%;border:0;border-radius:12px;padding:15px;font-size:16px;font-weight:600;margin:10px 0;background:var(--accent);color:#fff}
+  .btn.sub{background:#e4ddcd;color:var(--ink)}
+  .btn:disabled{opacity:.4}
+  label.chk{display:flex;gap:10px;align-items:flex-start;margin:8px 0;font-size:15px}
+  label.chk input{width:20px;height:20px;margin-top:2px}
+  .journal{font-family:"Nanum Myeongjo",serif;font-size:17px;border-left:3px solid var(--warm);padding-left:10px}
+  .hidden{display:none!important}
+  /* in-experience overlay */
+  #hud{position:fixed;inset:0;z-index:10;pointer-events:none;font-size:16px}
+  #hud .top{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px}
+  .pill{background:rgba(20,20,18,.55);color:#fff;border-radius:999px;padding:6px 12px;font-size:13px}
+  #say{position:absolute;left:12px;right:12px;bottom:18px;background:rgba(255,250,240,.94);border-radius:16px;padding:14px 16px;line-height:1.55;pointer-events:auto;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+  #say .row{display:flex;gap:8px;margin-top:10px}
+  #say .row button{flex:1;border:0;border-radius:10px;padding:12px;font-size:15px;font-weight:600;background:var(--accent);color:#fff}
+  #say .row button.opt{background:#efe7d6;color:var(--ink);font-weight:500;text-align:left}
+  #warn{position:absolute;top:56px;left:50%;transform:translateX(-50%);background:#d9534f;color:#fff;border-radius:12px;padding:10px 14px;font-weight:600}
+  #gaze{position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;
+        background:conic-gradient(#ffd27a var(--p,0%),rgba(255,255,255,.25) 0);-webkit-mask:radial-gradient(circle,transparent 25px,#000 26px);mask:radial-gradient(circle,transparent 25px,#000 26px)}
+  #dot{position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:rgba(255,255,255,.85)}
+  #exitBtn{position:absolute;top:50px;right:12px;pointer-events:auto;border:0;border-radius:999px;padding:6px 12px;background:rgba(20,20,18,.55);color:#fff;font-size:13px}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+
+<!-- 1. 현장 도착 -->
+<section id="pCheckin" class="page">
+  <p class="muted">시간의 수호자 · 첫 방문 현장</p>
+  <h1>보성 비봉리 — 보리의 부화</h1>
+  <div class="card">지금 계신 곳을 <b>보성 비봉리 공룡알 화석지</b>라고 가정하고 시작해요. 이곳은 실제로 공룡알 화석이 많이 남아 있는 해안이에요.</div>
+  <div id="revisit" class="card hidden"></div>
+  <h2>안전 확인</h2>
+  <label class="chk"><input type="checkbox" class="safe"> 평평하고 걸려 넘어질 것이 없는 곳이에요</label>
+  <label class="chk"><input type="checkbox" class="safe"> 주변에 사람·차·자전거가 적어요 (공원·운동장 등)</label>
+  <label class="chk"><input type="checkbox" class="safe"> 어린이는 보호자와 함께해요</label>
+  <button id="bLocate" class="btn" disabled>현장 도착 확인 (내 위치 기록)</button>
+  <div id="locInfo" class="muted"></div>
+  <button id="bStart" class="btn hidden">AR로 시작하기</button>
+  <button id="bPreview" class="btn sub hidden">화면 미리보기로 시작 (AR 미지원 기기)</button>
+  <p class="muted">약 10~15분 · 둥지 주변 반경 2m 안에서 천천히 움직여요. 현장 체험 시간에는 보리의 수명이 줄지 않아요.</p>
+  <a class="muted" href="./">← 보리 모델 보기로 돌아가기</a>
+</section>
+
+<!-- 체험 중 화면 위 표시 -->
+<div id="hud" class="hidden">
+  <div class="top"><span class="pill" id="siteClock">보성 현장 · 0:00 · 수명 소모 없음</span><span class="pill" id="progress"></span></div>
+  <button id="exitBtn">나가기</button>
+  <div id="warn" class="hidden"></div>
+  <div id="gaze" class="hidden"></div>
+  <div id="dot" class="hidden"></div>
+  <div id="say"><div id="sayText"></div><div class="row" id="sayRow"></div></div>
+</div>
+
+<!-- 3. 현재 귀환 -->
+<section id="pReturn" class="page hidden">
+  <p class="muted">현재로 돌아왔어요</p>
+  <h1>보성 비봉리 해안</h1>
+  <div class="card">지금 보성 해안의 바위에 남은 공룡알 화석들은, <b>깨어나지 못한 알들</b>이에요. 오늘 본 둥지의 알들처럼, 그 알들도 한때는 따뜻했어요.</div>
+  <h2>관찰일지에 새겨진 한 줄</h2>
+  <div class="card journal">보리는 보성 해안의 둥지에서 처음 눈을 떴다.</div>
+  <h2>이번 현장 기록</h2>
+  <div class="card" id="summary"></div>
+  <div class="card muted">기록과 위치는 이 휴대폰에만 저장되고 서버로 보내지 않아요.</div>
+  <button class="btn" id="bJournal">관찰일지 전체 보기</button>
+  <div id="journalAll" class="hidden"></div>
+  <button class="btn sub" onclick="location.reload()">처음으로</button>
+</section>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const $ = s => document.querySelector(s);
+const KEY = 'guardian.v1';
+const store = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || { visits: [], journal: [] }; } catch { return { visits: [], journal: [] }; } })();
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch {} };
+
+// ---------- 현장 도착 화면 ----------
+const prev = store.visits.find(v => v.site === 'boseong' && v.stage === 'birth');
+if (prev) {
+  $('#revisit').classList.remove('hidden');
+  $('#revisit').innerHTML = `이 생애에서 이미 보성 '탄생' 이벤트를 마쳤어요 (${new Date(prev.end).toLocaleDateString('ko-KR')}).<br>
+  <span class="muted">규칙상 현장 시간 연장(2~3시간, 수명 소모 없음)은 생애 단계별 첫 방문에만 적용돼요. 지금은 시연용으로 다시 할 수 있어요.</span>`;
+}
+const checks = [...document.querySelectorAll('.safe')];
+checks.forEach(c => c.onchange = () => $('#bLocate').disabled = !checks.every(x => x.checked));
+
+const visit = { site: 'boseong', stage: 'birth', start: null, end: null, lat: null, lng: null, acc: null, blessing: null };
+let xrSupported = false;
+if (navigator.xr) navigator.xr.isSessionSupported('immersive-ar').then(ok => xrSupported = ok).catch(() => {});
+
+$('#bLocate').onclick = () => {
+  $('#locInfo').textContent = '위치를 확인하는 중…';
+  const done = () => {
+    visit.start = Date.now();
+    $('#bLocate').classList.add('hidden');
+    if (xrSupported) $('#bStart').classList.remove('hidden');
+    else $('#locInfo').textContent += ' · 이 기기는 AR을 지원하지 않아 화면 미리보기로 진행해요.';
+    $('#bPreview').classList.remove('hidden');
+  };
+  if (!navigator.geolocation) { $('#locInfo').textContent = '위치 기능이 없어 위치 없이 진행해요.'; return done(); }
+  navigator.geolocation.getCurrentPosition(p => {
+    visit.lat = +p.coords.latitude.toFixed(5); visit.lng = +p.coords.longitude.toFixed(5); visit.acc = Math.round(p.coords.accuracy);
+    $('#locInfo').textContent = `현장으로 지정했어요 (오차 약 ${visit.acc}m).`;
+    done();
+  }, () => { $('#locInfo').textContent = '위치 허용이 안 되어 위치 없이 진행해요.'; done(); },
+  { enableHighAccuracy: true, timeout: 12000 });
+};
+
+// ---------- 3D 장면 ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
+renderer.domElement.style.visibility = 'hidden';
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.01, 50);
+scene.add(new THREE.HemisphereLight(0xfff6e6, 0x9a8a6a, 2.2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(1, 3, 2); scene.add(sun);
+addEventListener('resize', () => { if (renderer.xr.isPresenting) return; camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+const world = new THREE.Group(); world.visible = false; scene.add(world);
+
+function blobTex() {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  const r = g.createRadialGradient(64, 64, 4, 64, 64, 62); r.addColorStop(0, 'rgba(0,0,0,.45)'); r.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = r; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c);
+}
+const BLOB = blobTex();
+function shadow(size) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ map: BLOB, transparent: true, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2; m.position.y = 0.002; return m;
+}
+const std = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...extra });
+
+// 둥지
+const nest = new THREE.Group(); world.add(nest);
+nest.add(shadow(0.9));
+const base = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.28, 0.025, 40), std(0xd8c39a)); base.position.y = 0.012; nest.add(base);
+const rim = new THREE.Mesh(new THREE.TorusGeometry(0.23, 0.045, 12, 48), std(0x9b7b4f)); rim.rotation.x = -Math.PI / 2; rim.scale.z = 0.7; rim.position.y = 0.03; nest.add(rim);
+for (let i = 0; i < 26; i++) {
+  const a = Math.random() * Math.PI * 2, s = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.12 + Math.random() * 0.08, 5), std(i % 2 ? 0x7a5c38 : 0xa88658));
+  s.position.set(Math.sin(a) * 0.23, 0.05, Math.cos(a) * 0.23); s.rotation.set(Math.PI / 2, a + 1.2 + Math.random() * 0.6, Math.random() * 0.5); nest.add(s);
+}
+// 알 5개 (지름 약 12cm), 0번이 식어가는 알
+const eggGeo = new THREE.SphereGeometry(0.06, 32, 24); eggGeo.scale(1, 1.08, 1);
+const COLD = new THREE.Color(0xbcd6ec), WARM = new THREE.Color(0xfff3de);
+const eggs = [];
+for (let i = 0; i < 5; i++) {
+  const a = i * Math.PI * 2 / 5, e = new THREE.Mesh(eggGeo, std(0xfff3de, { roughness: 0.7 }));
+  e.position.set(Math.sin(a) * 0.13, 0.058, Math.cos(a) * 0.13); nest.add(e); eggs.push(e);
+}
+const coldEgg = eggs[0];
+let warmth = 1; // 1=따뜻, 0=차가움
+function setWarmth(w) { warmth = w; coldEgg.material.color.copy(COLD).lerp(WARM, w); coldEgg.material.emissive = new THREE.Color(0xff9a3c).multiplyScalar(w > 0.99 ? 0.12 : 0); }
+
+// 마른 풀 더미 3개
+const grassSpots = [[-1.05, 0.35], [1.0, 0.55], [0.15, -1.15]];
+const grass = grassSpots.map(([x, z]) => {
+  const g = new THREE.Group(); g.position.set(x, 0, z);
+  for (let i = 0; i < 16; i++) {
+    const h = 0.12 + Math.random() * 0.12, c = new THREE.Mesh(new THREE.ConeGeometry(0.01, h, 4), std(i % 3 ? 0xc9a85a : 0xa98a44));
+    c.position.set((Math.random() - .5) * 0.12, h / 2, (Math.random() - .5) * 0.12); c.rotation.set((Math.random() - .5) * 0.6, 0, (Math.random() - .5) * 0.6); g.add(c);
+  }
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.13, 0.15, 40), new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.6, side: THREE.DoubleSide }));
+  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.004; g.add(ring); g.userData.ring = ring;
+  g.add(shadow(0.3)); g.visible = false; g.userData.done = false; world.add(g); return g;
+});
+const straw = new THREE.Group(); nest.add(straw);   // 알 위에 덮이는 풀
+function addStraw() {
+  for (let i = 0; i < 9; i++) {
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.09, 4), std(0xc9a85a));
+    c.position.set(coldEgg.position.x + (Math.random() - .5) * 0.1, 0.09 + Math.random() * 0.03, coldEgg.position.z + (Math.random() - .5) * 0.08);
+    c.rotation.set(Math.PI / 2 + (Math.random() - .5) * 0.5, Math.random() * Math.PI, 0); straw.add(c);
+  }
+}
+
+// 껍질 조각 (부화용)
+const halfGeo = (top) => { const g = new THREE.SphereGeometry(0.06, 32, 16, 0, Math.PI * 2, top ? 0 : Math.PI * 0.45, top ? Math.PI * 0.45 : Math.PI * 0.55); g.scale(1, 1.08, 1); return g; };
+const shellMat = std(0xfff3de, { roughness: 0.7, side: THREE.DoubleSide });
+const shellBottom = new THREE.Mesh(halfGeo(false), shellMat), shellTop = new THREE.Mesh(halfGeo(true), shellMat);
+shellBottom.visible = shellTop.visible = false; nest.add(shellBottom, shellTop);
+
+// 기억의 지층 (응시하면 축복)
+const strata = new THREE.Group(); strata.position.set(-0.55, 0, -0.3); strata.visible = false; world.add(strata);
+[0x8a6f52, 0xb59a74, 0x6f5a45, 0xc8b08a, 0x7d6650, 0xa58b6a, 0x9c8160].forEach((c, i) => {
+  const r = 0.11 - i * 0.006, m = new THREE.Mesh(new THREE.CylinderGeometry(r - 0.004, r, 0.05, 28), std(c, { emissive: 0x000000 }));
+  m.position.y = 0.025 + i * 0.05; strata.add(m);
+});
+strata.add(shadow(0.45));
+
+// 보리
+let bori = null;
+const boriShadow = shadow(0.4); boriShadow.visible = false; world.add(boriShadow);
+new GLTFLoader().load('bori.glb', g => { bori = g.scene; bori.visible = false; world.add(bori); });
+
+// 바닥 조준 표시
+const reticle = new THREE.Mesh(new THREE.RingGeometry(0.1, 0.13, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+reticle.matrixAutoUpdate = false; reticle.visible = false; scene.add(reticle);
+
+// ---------- 소리·진동 ----------
+let actx = null;
+const audio = () => { if (!actx) try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch {} return actx; };
+function crack() {
+  const a = audio(); if (!a) return; const n = a.createBufferSource(), b = a.createBuffer(1, a.sampleRate * 0.08, a.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3);
+  n.buffer = b; const g = a.createGain(); g.gain.value = 0.5; n.connect(g).connect(a.destination); n.start();
+  navigator.vibrate?.(25);
+}
+function chirp(delay = 0) {
+  const a = audio(); if (!a) return; const o = a.createOscillator(), g = a.createGain(), t = a.currentTime + delay;
+  o.type = 'sine'; o.frequency.setValueAtTime(1100, t); o.frequency.exponentialRampToValueAtTime(1700, t + 0.12);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.18, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + 0.2);
+}
+function wind() {
+  const a = audio(); if (!a) return; const n = a.createBufferSource(), b = a.createBuffer(1, a.sampleRate * 1.2, a.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / d.length);
+  const f = a.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 700; const g = a.createGain(); g.gain.value = 0.25;
+  n.buffer = b; n.connect(f).connect(g).connect(a.destination); n.start();
+}
+
+// ---------- 말풍선 ----------
+function say(html, buttons = [], opts = false) {
+  $('#sayText').innerHTML = html; const row = $('#sayRow'); row.innerHTML = '';
+  row.style.flexDirection = opts ? 'column' : 'row';
+  buttons.forEach(([label, fn]) => { const b = document.createElement('button'); b.textContent = label; if (opts) b.className = 'opt'; b.onclick = fn; row.appendChild(b); });
+  $('#say').classList.toggle('hidden', !html && !buttons.length);
+}
+function warn(msg) { $('#warn').textContent = msg || ''; $('#warn').classList.toggle('hidden', !msg); }
+// AR 화면에서 버튼을 눌러도 '바닥 탭'으로 처리되지 않게
+document.querySelectorAll('#say,#exitBtn').forEach(el => el.addEventListener('beforexrselect', e => e.preventDefault()));
+
+// ---------- 진행 단계 ----------
+let state = 'idle', mode = 'xr', anchor = null, lastHit = null, hatchT = 0, gazeT = 0, collected = 0;
+const G = { get state() { return state; } }; window.G = G;   // 시험용
+
+function setProgress() {
+  const steps = { scan: '둥지 놓기', intro: '도입', mission: `임무 ${collected}/3`, quiz: '추리', hatch: '…', gaze: '기억의 지층', end: '' };
+  $('#progress').textContent = steps[state] || ''; $('#progress').classList.toggle('hidden', !steps[state]);
+}
+function go(s) { state = s; setProgress(); enter[s]?.(); }
+
+const intro = [
+  '1억 년 전, 이곳 보성 해안은 따뜻하고 넓은 호숫가였어요.',
+  '모래 언덕 위 작은 둥지에 알 다섯 개가 놓여 있어요. 지름 12cm쯤, 실제 크기예요.',
+  '수호자는 보이지 않아요. 알을 직접 만질 수도 없어요.<br><b>과거를 바꾸면 안 되니까요.</b>',
+  '그런데… 저녁 바람에 앞쪽 알 하나가 식어 가고 있어요.',
+];
+const enter = {
+  scan() {
+    say(mode === 'xr' ? '휴대폰을 천천히 좌우로 움직여 바닥을 비춰 주세요.<br>하얀 동그라미가 보이면 <b>화면을 톡</b> 눌러 둥지를 놓아요.' : '');
+  },
+  intro() {
+    let i = 0;
+    const next = () => {
+      if (i === 3) { let t = 0; const cool = setInterval(() => { t += 0.05; setWarmth(Math.max(0, 1 - t)); if (t >= 1) clearInterval(cool); }, 40); wind(); }
+      if (i < intro.length) say(intro[i++], [['다음', next]]);
+      else go('mission');
+    };
+    next();
+  },
+  mission() {
+    grass.forEach(g => g.visible = true);
+    say(mode === 'xr'
+      ? '둥지 주변에 반짝이는 <b>마른 풀 더미 3개</b>가 있어요. 천천히 걸어가 가까이 서 보세요.<br>수호자가 다가가면 바람이 풀을 둥지로 날라 줘요.'
+      : '둥지 주변 <b>마른 풀 더미 3개</b>를 눌러 보세요. (AR에서는 직접 걸어가 가까이 서면 돼요)');
+  },
+  quiz() {
+    say('알이 다시 따뜻해졌어요. 그런데 수호자 수첩에 질문이 하나 떠올랐어요.<br><b>보성에서 발견된 공룡알 화석의 지름은 어느 정도일까요?</b>', [
+      ['달걀만큼 (약 5cm)', () => answer(false)],
+      ['자몽만큼 (약 9~15cm)', () => answer(true)],
+      ['수박만큼 (약 30cm)', () => answer(false)],
+    ], true);
+  },
+  hatch() { hatchT = 0; say(''); $('#say').classList.add('hidden'); },
+  gaze() {
+    strata.visible = true; strata.scale.setScalar(0.01); gazeT = 0;
+    $('#gaze').classList.remove('hidden'); $('#dot').classList.remove('hidden');
+    say(mode === 'xr' ? '둥지 옆에 오래된 돌이 솟아올랐어요. 줄무늬가 겹겹이 쌓인 <b>기억의 지층</b>이에요.<br>가운데 점을 돌에 맞추고 <b>3초 동안</b> 바라보세요.'
+                      : '둥지 옆에 <b>기억의 지층</b>이 솟아올랐어요. 손가락(마우스)을 돌 위에 <b>3초 동안</b> 올려 두세요.');
+  },
+  end() {
+    $('#gaze').classList.add('hidden'); $('#dot').classList.add('hidden');
+    say(`기억의 지층이 작은 빛을 건넸어요.<br><b>${visit.blessing}</b><br><span style="color:#7a7468;font-size:14px">이 축복은 다음 생에서 작게 나타나요.</span>`, [['현재로 돌아가기', finish]]);
+  },
+};
+function answer(ok) {
+  if (ok) say('맞아요! 비봉리의 알 화석은 지름 9~15cm쯤이에요. 지금 보이는 알도 그 크기예요.<br><b>손을 알 옆에 대고 크기를 비교해 보세요.</b>', [['알이 움직여요…', () => go('hatch')]]);
+  else say('조금 달라요. 둥지 속 알을 다시 보세요. 손을 옆에 대고 비교해 보면 힌트가 돼요.', [['다시 고르기', () => enter.quiz()]]);
+}
+const blessings = ['따뜻한 둥지 — 다음 생의 알이 조금 더 일찍 깨어나요.', '바람의 친구 — 다음 생에서 마른 풀이 한 번 더 모여들어요.', '오래 남는 발자국 — 다음 생의 첫 발자국이 더 오래 남아요.'];
+
+function finish() {
+  visit.end = Date.now();
+  store.visits.push({ ...visit });
+  store.journal.push({ t: visit.end, line: '보리는 보성 해안의 둥지에서 처음 눈을 떴다.', site: '보성 비봉리' });
+  save();
+  if (renderer.xr.isPresenting) renderer.xr.getSession().end(); else showReturn();
+}
+function showReturn() {
+  state = 'done'; $('#hud').classList.add('hidden'); renderer.domElement.style.visibility = 'hidden'; renderer.setAnimationLoop(null);
+  const mins = Math.max(1, Math.round((visit.end - visit.start) / 60000));
+  $('#summary').innerHTML = `현장: 보성 비봉리 (가정)${visit.lat ? ` · 위치 ${visit.lat}, ${visit.lng}` : ''}<br>
+    머문 시간: 약 ${mins}분 · <b>보리의 수명 소모 없음</b><br>받은 축복: ${visit.blessing || '-'}<br>
+    남긴 흔적: 이 자리에 <b>보리의 첫 발자국</b>이 기록됐어요. 다음에 이곳에 오면 다시 볼 수 있어요.`;
+  $('#pReturn').classList.remove('hidden');
+}
+$('#bJournal').onclick = () => {
+  const el = $('#journalAll'); el.classList.toggle('hidden');
+  el.innerHTML = store.journal.map(j => `<div class="card journal">${j.line}<div class="muted" style="font-family:sans-serif;font-size:13px">${new Date(j.t).toLocaleString('ko-KR')} · ${j.site}</div></div>`).join('');
+};
+
+// ---------- 시작 ----------
+function startCommon() {
+  audio()?.resume?.();
+  $('#pCheckin').classList.add('hidden'); $('#hud').classList.remove('hidden');
+  renderer.domElement.style.visibility = 'visible';
+  renderer.setAnimationLoop(loop);
+}
+$('#bStart').onclick = async () => {
+  mode = 'xr';
+  try {
+    const session = await navigator.xr.requestSession('immersive-ar', {
+      requiredFeatures: ['hit-test'], optionalFeatures: ['dom-overlay', 'anchors'], domOverlay: { root: $('#hud') } });
+    renderer.xr.setReferenceSpaceType('local');
+    await renderer.xr.setSession(session);
+    startCommon();
+    const viewer = await session.requestReferenceSpace('viewer');
+    G.hitSource = await session.requestHitTestSource({ space: viewer });
+    session.addEventListener('select', onTap);
+    session.addEventListener('end', () => { if (visit.end) showReturn(); else location.reload(); });
+    go('scan');
+  } catch (e) { alert('AR을 시작하지 못했어요: ' + e.message + '\n화면 미리보기로 진행해 주세요.'); }
+};
+$('#bPreview').onclick = () => {
+  mode = 'preview';
+  scene.background = new THREE.Color(0xe9e2d2);
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(3, 64), std(0xcfc3a6)); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.001; scene.add(ground);
+  camera.position.set(0.6, 1.1, 1.7);
+  const oc = new OrbitControls(camera, renderer.domElement); oc.target.set(0, 0.05, 0); oc.maxPolarAngle = 1.45; oc.minDistance = 0.4; oc.maxDistance = 4; oc.update();
+  renderer.domElement.addEventListener('pointerdown', onPointerTap);
+  renderer.domElement.addEventListener('pointermove', e => { pointer.set(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1); });
+  startCommon();
+  placeWorld(new THREE.Vector3(0, 0, 0), 0);
+};
+$('#exitBtn').onclick = () => { if (renderer.xr.isPresenting) renderer.xr.getSession().end(); else location.reload(); };
+
+function placeWorld(pos, yaw) {
+  world.position.copy(pos); world.rotation.set(0, yaw, 0); world.visible = true; reticle.visible = false; go('intro');
+}
+function onTap() {
+  if (state !== 'scan' || !reticle.visible) return;
+  const p = new THREE.Vector3().setFromMatrixPosition(reticle.matrix);
+  const cam = new THREE.Vector3().setFromMatrixPosition(renderer.xr.getCamera().matrixWorld);
+  const yaw = Math.atan2(cam.x - p.x, cam.z - p.z);   // 둥지 앞쪽(+z)이 나를 향하게
+  if (lastHit?.createAnchor) lastHit.createAnchor().then(a => anchor = a).catch(() => {});
+  placeWorld(p, yaw);
+}
+const pointer = new THREE.Vector2(9, 9), ray = new THREE.Raycaster();
+function onPointerTap(e) {
+  pointer.set(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1);
+  if (state !== 'mission') return;
+  ray.setFromCamera(pointer, camera);
+  const hit = ray.intersectObjects(grass.filter(g => g.visible && !g.userData.done), true)[0];
+  if (hit) { let g = hit.object; while (!grass.includes(g)) g = g.parent; collect(g); }
+}
+
+// 풀 모으기
+const flying = [];
+function collect(g) {
+  if (g.userData.done) return; g.userData.done = true; g.userData.ring.visible = false; wind();
+  flying.push({ g, t: 0, from: g.position.clone() });
+}
+
+// ---------- 매 프레임 ----------
+const clock = new THREE.Clock(), lastCam = new THREE.Vector3(); let speed = 0, haveLast = false;
+const camPos = new THREE.Vector3(), camDir = new THREE.Vector3(), tmpQ = new THREE.Quaternion(), tmpV = new THREE.Vector3(), flatV = new THREE.Vector3();
+function loop(t, frame) {
+  const dt = Math.min(clock.getDelta(), 0.1), time = clock.elapsedTime;
+  const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
+  cam.matrixWorld.decompose(camPos, tmpQ, tmpV); camDir.set(0, 0, -1).applyQuaternion(tmpQ);
+
+  // 현장 시계
+  if (visit.start) { const s = Math.floor((Date.now() - visit.start) / 1000); $('#siteClock').textContent = `보성 현장 · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} · 수명 소모 없음`; }
+
+  if (frame) {
+    const ref = renderer.xr.getReferenceSpace();
+    if (state === 'scan' && G.hitSource) {
+      const hits = frame.getHitTestResults(G.hitSource);
+      if (hits.length) { lastHit = hits[0]; reticle.visible = true; reticle.matrix.fromArray(hits[0].getPose(ref).transform.matrix); }
+      else reticle.visible = false;
+    }
+    if (anchor && frame.trackedAnchors?.has(anchor)) {   // 둥지를 바닥 기준점에 붙여 두기 (뜨는 현상 방지)
+      const p = frame.getPose(anchor.anchorSpace, ref); if (p) { const m = p.transform.position; world.position.set(m.x, m.y, m.z); }
+    }
+    // 걷는 속도·거리 안전 확인
+    const flat = flatV.set(camPos.x, 0, camPos.z);
+    if (haveLast) speed = speed * 0.9 + (flat.distanceTo(lastCam) / Math.max(dt, 1e-3)) * 0.1;
+    lastCam.copy(flat); haveLast = true;
+    const far = world.visible && flat.distanceTo(tmpV.set(world.position.x, 0, world.position.z)) > 3.5;
+    warn(speed > 1.3 ? '천천히 걸어요 🐢' : far ? '둥지에서 너무 멀어졌어요. 돌아와 주세요.' : '');
+  }
+
+  // 임무: 가까이 서면 풀이 날아감 (AR)
+  if (state === 'mission' && mode === 'xr' && speed < 1.3) {
+    for (const g of grass) if (g.visible && !g.userData.done) {
+      const w = g.getWorldPosition(tmpV); if (Math.hypot(w.x - camPos.x, w.z - camPos.z) < 0.75) collect(g);
+    }
+  }
+  grass.forEach(g => { if (g.userData.ring.visible) g.userData.ring.material.opacity = 0.35 + 0.3 * Math.sin(time * 3); });
+  for (let i = flying.length - 1; i >= 0; i--) {
+    const f = flying[i]; f.t += dt / 1.3; const k = Math.min(f.t, 1), e = k * k * (3 - 2 * k);
+    f.g.position.lerpVectors(f.from, tmpV.copy(coldEgg.position).setY(0.05), e); f.g.position.y += Math.sin(k * Math.PI) * 0.5;
+    f.g.scale.setScalar(1 - 0.85 * e); f.g.rotation.y += dt * 4;
+    if (k >= 1) { f.g.visible = false; flying.splice(i, 1); collected++; addStraw(); setWarmth(collected / 3); setProgress();
+      if (collected === 3) setTimeout(() => go('quiz'), 900); }
+  }
+
+  // 부화 (대사 없는 장면)
+  if (state === 'hatch') {
+    const pt = hatchT; hatchT += dt; const h = hatchT;
+    const egg = coldEgg;
+    if (h < 2.6) {
+      egg.rotation.z = Math.sin(h * 18) * 0.08 * (h / 2.6); egg.rotation.x = Math.cos(h * 13) * 0.05 * (h / 2.6);
+      [0.6, 1.4, 2.0, 2.4].forEach(c => { if (pt < c && h >= c) crack(); });
+    } else {
+      if (pt < 2.6) {   // 껍질이 열림
+        crack(); egg.visible = false; straw.visible = false;
+        shellBottom.position.copy(egg.position); shellTop.position.copy(egg.position); shellBottom.visible = shellTop.visible = true;
+        if (bori) { bori.visible = true; boriShadow.visible = true; }
+      }
+      const k1 = Math.min((h - 2.6) / 0.8, 1);
+      shellTop.position.set(egg.position.x + 0.14 * k1, egg.position.y + Math.sin(k1 * Math.PI) * 0.12 - 0.05 * k1, egg.position.z + 0.18 * k1);
+      shellTop.rotation.set(2.6 * k1, 0, 0.8 * k1);
+      if (bori) {
+        const k2 = Math.min((h - 2.6) / 3.0, 1), e2 = 1 - Math.pow(1 - k2, 3);
+        bori.scale.setScalar(0.45 + 0.55 * e2);
+        bori.position.set(0, 0, THREE.MathUtils.lerp(egg.position.z - 0.05, 0.5, e2));
+        boriShadow.position.set(0, 0.003, bori.position.z - 0.03); boriShadow.scale.setScalar(bori.scale.x);
+      }
+      if (pt < 6 && h >= 6) { chirp(0); chirp(0.25); }
+      if (pt < 9 && h >= 9) say('', [['계속', () => go('gaze')]]);
+    }
+  }
+  // 깨어난 뒤의 보리: 숨쉬기 + 수호자 쪽을 살짝 바라봄
+  if (bori?.visible && (state === 'hatch' && hatchT > 5.6 || state === 'gaze' || state === 'end')) {
+    bori.scale.y = bori.scale.x * (1 + Math.sin(time * 2.4) * 0.012);
+    const local = world.worldToLocal(tmpV.copy(camPos));
+    const want = THREE.MathUtils.clamp(Math.atan2(local.x - bori.position.x, local.z - bori.position.z), -0.9, 0.9);
+    bori.rotation.y += (want - bori.rotation.y) * Math.min(dt * 1.5, 1);
+  }
+
+  // 기억의 지층: 3초 응시
+  if (state === 'gaze') {
+    strata.scale.setScalar(Math.min(strata.scale.x + dt * 0.8, 1));
+    if (mode === 'xr') ray.set(camPos, camDir); else ray.setFromCamera(pointer, camera);
+    const on = ray.intersectObject(strata, true).length > 0;
+    gazeT = on ? gazeT + dt : Math.max(0, gazeT - dt * 0.5);
+    $('#gaze').style.setProperty('--p', `${Math.min(gazeT / 3, 1) * 100}%`);
+    strata.children.forEach((m, i) => m.material.emissive?.setRGB(0.25 * Math.min(gazeT / 3, 1), 0.18 * Math.min(gazeT / 3, 1), 0.05 * Math.min(gazeT / 3, 1)));
+    if (gazeT >= 3) { visit.blessing = blessings[Math.floor(Math.random() * blessings.length)]; chirp(0); go('end'); }
+  }
+
+  renderer.render(scene, camera);
+}
+G.debug = { collectAll: () => grass.forEach(collect), answer, go, get bori() { return bori; } };
+</script>
+</body>
+</html>
