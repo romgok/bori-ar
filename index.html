@@ -27,7 +27,7 @@
     <button id="t1" class="on" onclick="pick('bori_hatch.glb',this)">알에서 깨어난 보리</button>
     <button id="t2" onclick="pick('bori.glb',this)">걸음마하는 보리</button>
   </div>
-  <model-viewer id="mv" src="bori_hatch.glb" alt="아기 공룡 보리" ar ar-modes="webxr scene-viewer quick-look" ar-scale="fixed" ar-placement="floor" camera-controls auto-rotate shadow-intensity="1" exposure="1.05" camera-orbit="35deg 72deg 1.3m" field-of-view="30deg">
+  <model-viewer id="mv" src="bori_hatch.glb" alt="아기 공룡 보리" ar ar-modes="scene-viewer webxr quick-look" ar-scale="fixed" ar-placement="floor" camera-controls auto-rotate shadow-intensity="1" exposure="1.05" camera-orbit="35deg 72deg 0.9m" field-of-view="30deg">
     <button slot="ar-button" class="arbtn">📷 내 공간에서 보기</button>
   </model-viewer>
   <div class="card">
@@ -35,8 +35,14 @@
     <ol>
       <li>휴대폰 크롬에서 이 페이지를 열고 <b>‘내 공간에서 보기’</b>를 누르세요.</li>
       <li>바닥을 비추며 휴대폰을 천천히 움직이면 평면이 인식돼요.</li>
-      <li>보리가 <b>실제 크기(몸길이 약 55cm)</b>로 바닥에 나타나요. 주위를 걸어 다니며 살펴보세요.</li>
+      <li>보리가 <b>추정 실제 크기(몸길이 약 30cm, 알 지름 약 12cm)</b>로 바닥에 나타나요. 쪼그려 앉아 눈높이를 낮춰 보세요.</li>
     </ol>
+    <b>바닥에서 뜨지 않게 하려면</b>
+    <ul>
+      <li>밝은 곳에서, 무늬가 있는 바닥(보도블록·흙·카펫)을 비추세요. 반짝이는 바닥·단색 바닥은 인식이 흔들려요.</li>
+      <li>처음 5초간 휴대폰을 천천히 좌우로 움직여 바닥을 충분히 스캔하세요.</li>
+      <li>그래도 뜨면 보리를 손가락으로 살짝 끌어 바닥에 다시 놓아주세요.</li>
+    </ul>
   </div>
   <div class="card muted">평평하고 주변에 사람이 적은 곳에서, 화면만 보며 걷지 않도록 주의하세요. 이 3D 모델은 기획 확인용 임시 모델이에요.</div>
 </main>
