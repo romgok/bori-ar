@@ -35,7 +35,7 @@
   #dot{position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:rgba(255,255,255,.85)}
   #exitBtn{position:absolute;top:50px;right:12px;pointer-events:auto;border:0;border-radius:999px;padding:6px 12px;background:rgba(20,20,18,.55);color:#fff;font-size:13px}
 </style>
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/","mindar-image-three":"https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"}}</script>
 </head>
 <body>
 
@@ -52,6 +52,13 @@
   <button id="bLocate" class="btn" disabled>현장 도착 확인 (내 위치 기록)</button>
   <div id="locInfo" class="muted"></div>
   <button id="bStart" class="btn hidden">AR로 시작하기</button>
+  <div id="matBox" class="card hidden">
+    <b>매트 모드</b> — 출력한 둥지 매트를 바닥에 깔고 비추면, 둥지가 매트 위에 단단히 고정돼요.<br>
+    <span class="muted">매트 PDF: <a href="mat/boseong_mat_A4_1sheet.pdf">A4 1장</a> · <a href="mat/boseong_mat_A4_4sheets.pdf">A4 4장 이어붙이기(권장)</a></span>
+    <label class="chk" style="margin-top:10px"><input type="radio" name="matsize" value="0.56" checked> A4 4장 이어붙인 매트 (약 56×40cm)</label>
+    <label class="chk"><input type="radio" name="matsize" value="0.28"> A4 1장 매트 (약 28×20cm)</label>
+    <button id="bMat" class="btn">매트 모드로 시작</button>
+  </div>
   <button id="bPreview" class="btn sub hidden">화면 미리보기로 시작 (AR 미지원 기기)</button>
   <p class="muted">약 10~15분 · 둥지 주변 반경 2m 안에서 천천히 움직여요. 현장 체험 시간에는 보리의 수명이 줄지 않아요.</p>
   <a class="muted" href="./">← 보리 모델 보기로 돌아가기</a>
@@ -113,7 +120,7 @@ $('#bLocate').onclick = () => {
     $('#bLocate').classList.add('hidden');
     if (xrSupported) $('#bStart').classList.remove('hidden');
     else $('#locInfo').textContent += ' · 이 기기는 AR을 지원하지 않아 화면 미리보기로 진행해요.';
-    $('#bPreview').classList.remove('hidden');
+    $('#bPreview').classList.remove('hidden'); $('#matBox').classList.remove('hidden');
   };
   if (!navigator.geolocation) { $('#locInfo').textContent = '위치 기능이 없어 위치 없이 진행해요.'; return done(); }
   navigator.geolocation.getCurrentPosition(p => {
@@ -125,7 +132,7 @@ $('#bLocate').onclick = () => {
 };
 
 // ---------- 3D 장면 ----------
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+let renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -133,11 +140,11 @@ renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 renderer.domElement.style.visibility = 'hidden';
 
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.01, 50);
-scene.add(new THREE.HemisphereLight(0xfff6e6, 0x9a8a6a, 2.2));
+let scene = new THREE.Scene();
+let camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.01, 50);
+const hemi = new THREE.HemisphereLight(0xfff6e6, 0x9a8a6a, 2.2); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(1, 3, 2); scene.add(sun);
-addEventListener('resize', () => { if (renderer.xr.isPresenting) return; camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+addEventListener('resize', () => { if (renderer.xr.isPresenting || mode === 'mat') return; camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
 const world = new THREE.Group(); world.visible = false; scene.add(world);
 
@@ -176,6 +183,7 @@ function setWarmth(w) { warmth = w; coldEgg.material.color.copy(COLD).lerp(WARM,
 
 // 마른 풀 더미 3개
 const grassSpots = [[-1.05, 0.35], [1.0, 0.55], [0.15, -1.15]];
+const grassSpotsMat = [[-0.42, 0.12], [0.42, 0.2], [0.12, -0.38]];   // 매트 모드: 매트 가장자리 근처
 const grass = grassSpots.map(([x, z]) => {
   const g = new THREE.Group(); g.position.set(x, 0, z);
   for (let i = 0; i < 16; i++) {
@@ -282,7 +290,9 @@ const enter = {
   },
   mission() {
     grass.forEach(g => g.visible = true);
-    say(mode === 'xr'
+    say(mode === 'mat'
+      ? '둥지 주변에 반짝이는 <b>마른 풀 더미 3개</b>가 있어요. 화면에서 하나씩 <b>톡</b> 눌러 주세요.<br>수호자의 바람이 풀을 둥지로 날라 줘요.'
+      : mode === 'xr'
       ? '둥지 주변에 반짝이는 <b>마른 풀 더미 3개</b>가 있어요. 천천히 걸어가 가까이 서 보세요.<br>수호자가 다가가면 바람이 풀을 둥지로 날라 줘요.'
       : '둥지 주변 <b>마른 풀 더미 3개</b>를 눌러 보세요. (AR에서는 직접 걸어가 가까이 서면 돼요)');
   },
@@ -297,7 +307,7 @@ const enter = {
   gaze() {
     strata.visible = true; strata.scale.setScalar(0.01); gazeT = 0;
     $('#gaze').classList.remove('hidden'); $('#dot').classList.remove('hidden');
-    say(mode === 'xr' ? '둥지 옆에 오래된 돌이 솟아올랐어요. 줄무늬가 겹겹이 쌓인 <b>기억의 지층</b>이에요.<br>가운데 점을 돌에 맞추고 <b>3초 동안</b> 바라보세요.'
+    say(mode !== 'preview' ? '둥지 옆에 오래된 돌이 솟아올랐어요. 줄무늬가 겹겹이 쌓인 <b>기억의 지층</b>이에요.<br>가운데 점을 돌에 맞추고 <b>3초 동안</b> 바라보세요.'
                       : '둥지 옆에 <b>기억의 지층</b>이 솟아올랐어요. 손가락(마우스)을 돌 위에 <b>3초 동안</b> 올려 두세요.');
   },
   end() {
@@ -316,7 +326,7 @@ function finish() {
   store.visits.push({ ...visit });
   store.journal.push({ t: visit.end, line: '보리는 보성 해안의 둥지에서 처음 눈을 떴다.', site: '보성 비봉리' });
   save();
-  if (renderer.xr.isPresenting) renderer.xr.getSession().end(); else showReturn();
+  if (renderer.xr.isPresenting) renderer.xr.getSession().end(); else { if (G.mind) { G.mind.stop(); document.getElementById('matWrap')?.remove(); } showReturn(); }
 }
 function showReturn() {
   state = 'done'; $('#hud').classList.add('hidden'); renderer.domElement.style.visibility = 'hidden'; renderer.setAnimationLoop(null);
@@ -364,7 +374,38 @@ $('#bPreview').onclick = () => {
   startCommon();
   placeWorld(new THREE.Vector3(0, 0, 0), 0);
 };
-$('#exitBtn').onclick = () => { if (renderer.xr.isPresenting) renderer.xr.getSession().end(); else location.reload(); };
+$('#bMat').onclick = async () => {
+  mode = 'mat';
+  const width = +document.querySelector('input[name=matsize]:checked').value;
+  $('#bMat').disabled = true; $('#bMat').textContent = '카메라와 매트 인식을 준비하는 중…';
+  try {
+    const { MindARThree } = await import('mindar-image-three');
+    const wrap = document.createElement('div'); wrap.id = 'matWrap';
+    wrap.style.cssText = 'position:fixed;inset:0;z-index:1;overflow:hidden'; document.body.appendChild(wrap);
+    const mind = new MindARThree({ container: wrap, imageTargetSrc: 'mat/mat.mind', uiScanning: 'no', uiLoading: 'no',
+                                   filterMinCF: 0.0001, filterBeta: 0.001, maxTrack: 1 });
+    renderer.domElement.remove();
+    renderer = mind.renderer; scene = mind.scene; camera = mind.camera;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    scene.add(hemi, sun);
+    // 매트 그림 좌표(가로 = 1)를 미터 단위로, 그림 면을 바닥으로
+    const holder = new THREE.Group(); holder.rotation.x = Math.PI / 2; holder.scale.setScalar(1 / width);
+    holder.add(world); world.position.set(0, 0, 0); world.rotation.set(0, 0, 0);
+    grass.forEach((g, i) => g.position.set(grassSpotsMat[i][0], 0, grassSpotsMat[i][1]));
+    strata.position.set(-0.42, 0, -0.12);
+    const anchor = mind.addAnchor(0); anchor.group.add(holder);
+    let seen = false;
+    anchor.onTargetFound = () => { warn(''); if (!seen) { seen = true; world.visible = true; go('intro'); } };
+    anchor.onTargetLost = () => { if (seen && state !== 'done') warn('매트가 화면 밖으로 나갔어요. 다시 비춰 주세요.'); };
+    await mind.start();
+    G.mind = mind;
+    window.addEventListener('pointerdown', e => { if (!e.target.closest('#say,#exitBtn')) onPointerTap(e); });
+    startCommon();
+    state = 'scan'; setProgress();
+    say('출력한 <b>둥지 매트</b>를 바닥에 펴고 화살표 쪽에 서세요.<br>처음에는 매트 <b>바로 위에서 내려다보듯</b> 비추고, 둥지가 나타나면 천천히 한두 걸음 물러나세요. 너무 비스듬히 보면 인식이 끊겨요.');
+  } catch (e) { alert('매트 모드를 시작하지 못했어요: ' + (e.message || e) + '\n카메라 권한을 확인해 주세요.'); location.reload(); }
+};
+$('#exitBtn').onclick = () => { if (renderer.xr.isPresenting) renderer.xr.getSession().end(); else { G.mind?.stop(); location.reload(); } };
 
 function placeWorld(pos, yaw) {
   world.position.copy(pos); world.rotation.set(0, yaw, 0); world.visible = true; reticle.visible = false; go('intro');
@@ -456,7 +497,7 @@ function loop(t, frame) {
       if (bori) {
         const k2 = Math.min((h - 2.6) / 3.0, 1), e2 = 1 - Math.pow(1 - k2, 3);
         bori.scale.setScalar(0.45 + 0.55 * e2);
-        bori.position.set(0, 0, THREE.MathUtils.lerp(egg.position.z - 0.05, 0.5, e2));
+        bori.position.set(0, 0, THREE.MathUtils.lerp(egg.position.z - 0.05, mode === 'mat' ? 0.34 : 0.5, e2));
         boriShadow.position.set(0, 0.003, bori.position.z - 0.03); boriShadow.scale.setScalar(bori.scale.x);
       }
       if (pt < 6 && h >= 6) { chirp(0); chirp(0.25); }
@@ -474,7 +515,7 @@ function loop(t, frame) {
   // 기억의 지층: 3초 응시
   if (state === 'gaze') {
     strata.scale.setScalar(Math.min(strata.scale.x + dt * 0.8, 1));
-    if (mode === 'xr') ray.set(camPos, camDir); else ray.setFromCamera(pointer, camera);
+    if (mode !== 'preview') ray.set(camPos, camDir); else ray.setFromCamera(pointer, camera);
     const on = ray.intersectObject(strata, true).length > 0;
     gazeT = on ? gazeT + dt : Math.max(0, gazeT - dt * 0.5);
     $('#gaze').style.setProperty('--p', `${Math.min(gazeT / 3, 1) * 100}%`);
